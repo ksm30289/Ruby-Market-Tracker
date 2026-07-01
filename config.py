@@ -1,5 +1,8 @@
 import os
 import json
+from datetime import datetime
+
+import pytz
 
 
 def required_env(name: str) -> str:
@@ -10,22 +13,6 @@ def required_env(name: str) -> str:
 
     return value.strip()
 
-
-from datetime import datetime
-
-TARGET_DATE = os.getenv("TARGET_DATE", "").strip()
-
-
-def get_target_date():
-
-    if TARGET_DATE:
-
-        return datetime.strptime(
-            TARGET_DATE,
-            "%Y-%m-%d",
-        ).date()
-
-    return datetime.now().date()
 
 SPREADSHEET_ID = required_env("SPREADSHEET_ID")
 
@@ -45,6 +32,12 @@ TIMEZONE = os.getenv(
     "TIMEZONE",
     "Asia/Seoul",
 )
+
+TARGET_DATE = os.getenv(
+    "TARGET_DATE",
+    "",
+).strip()
+
 
 ITEMMANIA_URL = os.getenv(
     "ITEMMANIA_URL",
@@ -72,3 +65,26 @@ OPENTALK_MIN_PRICE = float(
 OPENTALK_MAX_PRICE = float(
     os.getenv("OPENTALK_MAX_PRICE", "50")
 )
+
+
+def get_target_date():
+    """
+    TARGET_DATE가 있으면 해당 날짜 사용.
+    없으면 TIMEZONE 기준 오늘 날짜 사용.
+    """
+
+    if TARGET_DATE:
+        try:
+            return datetime.strptime(
+                TARGET_DATE,
+                "%Y-%m-%d",
+            ).date()
+
+        except ValueError:
+            raise RuntimeError(
+                "TARGET_DATE 형식은 YYYY-MM-DD 이어야 합니다."
+            )
+
+    tz = pytz.timezone(TIMEZONE)
+
+    return datetime.now(tz).date()
