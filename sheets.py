@@ -47,17 +47,16 @@ def find_date_row(worksheet, date_text):
 def save_market(row):
 
     """
-    row
+    OpenTalk 프로젝트
+
+    수정 컬럼
 
     A 날짜
     B 수집시간
-    C 아이템매니아 최저
-    D 아이템매니아 평균
-    E 아이템매니아 매물수
     F 오픈톡 평균
     G 오픈톡 최저
     H 오픈톡 최고
-    I 오픈톡 거래글수
+    I 거래건수
     J 비고
     K 특이사항
     """
@@ -73,9 +72,23 @@ def save_market(row):
 
     if target_row:
 
+        # A 날짜
+        worksheet.update_acell(
+            f"B{target_row}",
+            row[1],
+        )
+
+        # F~K만 수정
         worksheet.update(
-            f"A{target_row}:K{target_row}",
-            [row],
+            f"F{target_row}:K{target_row}",
+            [[
+                row[5],
+                row[6],
+                row[7],
+                row[8],
+                row[9],
+                row[10],
+            ]],
             value_input_option="USER_ENTERED",
         )
 
