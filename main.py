@@ -69,28 +69,28 @@ def main():
         now.strftime("%H:%M"),
 
         # C 아이템매니아 평균
-        ""
+        "",
 
         # D 아이템매니아 최고
-        ""
+        "",
 
         # E 아이템매니아 최저
-        ""
+        "",
 
         # F 아이템매니아 매물수
-        ""
+        "",
 
         # G 오픈톡 평균
-        opentalk["average"]
+        opentalk["average"],
 
-        # H
-        opentalk["lowest"]
+        # H 오픈톡 최저
+        opentalk["lowest"],
 
-        # I
-        opentalk["highest"]
+        # I 오픈톡 최고
+        opentalk["highest"],
 
-        # J
-        opentalk["count"]
+        # J 거래건수
+        opentalk["count"],
 
         # K 비고
         "",
