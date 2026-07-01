@@ -116,10 +116,10 @@ def main():
     print()
 
     print("■ OpenTalk")
-    print(f"평균 : {row[5]}")
-    print(f"최저 : {row[6]}")
-    print(f"최고 : {row[7]}")
-    print(f"거래 : {row[8]}")
+    print(f"평균 : {row[6]}")
+    print(f"최저 : {row[7]}")
+    print(f"최고 : {row[8]}")
+    print(f"거래 : {row[9]}")
 
     print()
 
