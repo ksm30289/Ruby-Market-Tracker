@@ -5,6 +5,7 @@ from config import (
     OPENTALK_DEDUPE_MINUTES,
     OPENTALK_MIN_PRICE,
     OPENTALK_MAX_PRICE,
+    get_target_date,
 )
 
 
@@ -107,17 +108,31 @@ def parse_chat_line(line: str):
     }
 
 
-def parse_opentalk_prices(text: str):
+def parse_opentalk_prices(text):
+
+    target_date = get_target_date()
+
     rows = []
+
+    total_messages = 0
+    target_messages = 0
 
     if not text:
         return rows
 
     for line in text.splitlines():
+
         parsed = parse_chat_line(line)
 
         if not parsed:
             continue
+
+        total_messages += 1
+
+        if parsed["datetime"].date() != target_date:
+            continue
+
+        target_messages += 1
 
         message = parsed["message"]
 
@@ -129,14 +144,18 @@ def parse_opentalk_prices(text: str):
         if price is None:
             continue
 
-        rows.append(
-            {
-                "datetime": parsed["datetime"],
-                "speaker": parsed["speaker"],
-                "message": message,
-                "price": price,
-            }
-        )
+        rows.append({
+            "datetime": parsed["datetime"],
+            "speaker": parsed["speaker"],
+            "message": message,
+            "price": price,
+        })
+
+    print()
+    print(f"대상 날짜 : {target_date}")
+    print(f"전체 메시지 : {total_messages:,}")
+    print(f"대상 날짜 메시지 : {target_messages:,}")
+    print(f"거래글 : {len(rows):,}")
 
     return rows
 
