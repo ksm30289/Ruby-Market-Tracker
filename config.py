@@ -11,6 +11,22 @@ def required_env(name: str) -> str:
     return value.strip()
 
 
+from datetime import datetime
+
+TARGET_DATE = os.getenv("TARGET_DATE", "").strip()
+
+
+def get_target_date():
+
+    if TARGET_DATE:
+
+        return datetime.strptime(
+            TARGET_DATE,
+            "%Y-%m-%d",
+        ).date()
+
+    return datetime.now().date()
+
 SPREADSHEET_ID = required_env("SPREADSHEET_ID")
 
 KAKAO_FOLDER_ID = required_env("KAKAO_FOLDER_ID")
