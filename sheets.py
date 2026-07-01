@@ -80,14 +80,14 @@ def save_market(row):
 
         # F~K만 수정
         worksheet.update(
-            f"F{target_row}:K{target_row}",
+            f"G{target_row}:L{target_row}",
             [[
-                row[5],
                 row[6],
                 row[7],
                 row[8],
                 row[9],
                 row[10],
+                row[11],
             ]],
             value_input_option="USER_ENTERED",
         )
