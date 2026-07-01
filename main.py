@@ -2,7 +2,10 @@ from datetime import datetime
 
 import pytz
 
-from config import TIMEZONE
+from config import (
+    TIMEZONE,
+    get_target_date,
+)
 
 from drive import get_latest_txt
 from itemmania import get_itemmania_market
@@ -35,6 +38,11 @@ def main():
 
     now = datetime.now(timezone)
 
+    target_date = get_target_date()
+
+    print(f"분석 대상 날짜 : {target_date}")
+    print()
+    
     print("[1/4] 아이템매니아 수집")
 
     itemmania = get_itemmania_market()
@@ -65,7 +73,7 @@ def main():
     row = [
 
         # A
-        now.strftime("%Y-%m-%d"),
+        target_date.strftime("%Y-%m-%d"),
 
         # B
         now.strftime("%H:%M"),
