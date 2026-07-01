@@ -8,17 +8,13 @@ from config import (
 )
 
 from drive import get_latest_txt
-from itemmania import get_itemmania_market
 from opentalk import get_opentalk_market
 from sheets import save_market
 
 
-def build_special_note(itemmania, opentalk):
+def build_special_note(opentalk):
 
     notes = []
-
-    if itemmania["count"] == 0:
-        notes.append("아이템매니아 수집 실패")
 
     if opentalk["count"] == 0:
         notes.append("오픈톡 시세 없음")
@@ -30,7 +26,7 @@ def main():
 
     print()
     print("=" * 70)
-    print(" Ruby Market Tracker")
+    print(" Ruby OpenTalk Tracker")
     print("=" * 70)
     print()
 
@@ -42,14 +38,8 @@ def main():
 
     print(f"분석 대상 날짜 : {target_date}")
     print()
-    
-    print("[1/4] 아이템매니아 수집")
 
-    itemmania = get_itemmania_market()
-
-    print()
-
-    print("[2/4] Google Drive 최신 파일")
+    print("[1/3] Google Drive 최신 파일")
 
     latest = get_latest_txt()
 
@@ -59,7 +49,7 @@ def main():
 
     print()
 
-    print("[3/4] 오픈톡 시세 분석")
+    print("[2/3] 오픈톡 시세 분석")
 
     opentalk = get_opentalk_market(
         latest["text"],
@@ -68,45 +58,42 @@ def main():
 
     print()
 
-    print("[4/4] Google Sheets 저장")
+    print("[3/3] Google Sheets 저장")
 
     row = [
 
-        # A
+        # A 날짜
         target_date.strftime("%Y-%m-%d"),
 
-        # B
+        # B 수집시간
         now.strftime("%H:%M"),
 
-        # C
-        itemmania["lowest"],
-
-        # D
-        itemmania["average"],
-
-        # E
-        itemmania["count"],
-
-        # F
-        opentalk["average"],
-
-        # G
-        opentalk["lowest"],
-
-        # H
-        opentalk["highest"],
-
-        # I
-        opentalk["count"],
-
-        # J
+        # C 아이템매니아 최저
         "",
 
-        # K
-        build_special_note(
-            itemmania,
-            opentalk,
-        ),
+        # D 아이템매니아 평균
+        "",
+
+        # E 아이템매니아 매물수
+        "",
+
+        # F 오픈톡 평균
+        opentalk["average"],
+
+        # G 오픈톡 최저
+        opentalk["lowest"],
+
+        # H 오픈톡 최고
+        opentalk["highest"],
+
+        # I 거래건수
+        opentalk["count"],
+
+        # J 비고
+        "",
+
+        # K 특이사항
+        build_special_note(opentalk),
 
     ]
 
@@ -122,13 +109,6 @@ def main():
 
     print("날짜 :", row[0])
     print("시간 :", row[1])
-
-    print()
-
-    print("■ Itemmania")
-    print(f"최저 : {row[2]}")
-    print(f"평균 : {row[3]}")
-    print(f"매물 : {row[4]}")
 
     print()
 
