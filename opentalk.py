@@ -108,7 +108,7 @@ def parse_chat_line(line: str):
     }
 
 
-def parse_opentalk_prices(text):
+def parse_opentalk_prices(text: str):
 
     target_date = get_target_date()
 
@@ -129,6 +129,7 @@ def parse_opentalk_prices(text):
 
         total_messages += 1
 
+        # 대상 날짜만 분석
         if parsed["datetime"].date() != target_date:
             continue
 
@@ -152,6 +153,9 @@ def parse_opentalk_prices(text):
         })
 
     print()
+    print("=" * 60)
+    print("[OpenTalk] 날짜 분석")
+    print("=" * 60)
     print(f"대상 날짜 : {target_date}")
     print(f"전체 메시지 : {total_messages:,}")
     print(f"대상 날짜 메시지 : {target_messages:,}")
@@ -200,7 +204,13 @@ def get_opentalk_market(text: str, filename: str = ""):
 
     try:
         rows = parse_opentalk_prices(text)
+
+        before_count = len(rows)
+
         rows = dedupe_prices(rows)
+
+        print(f"중복 제거 전 : {before_count}")
+        print(f"중복 제거 후 : {len(rows)}")
 
         prices = [
             row["price"]
@@ -226,11 +236,11 @@ def get_opentalk_market(text: str, filename: str = ""):
             "rows": rows,
         }
 
-        print(f"거래글수 : {result['count']}")
+        print()
         print(f"평균 : {result['average']}")
         print(f"최저 : {result['lowest']}")
         print(f"최고 : {result['highest']}")
-        print("=" * 60)
+        print(f"최종 거래글 : {result['count']}")
 
         return result
 
