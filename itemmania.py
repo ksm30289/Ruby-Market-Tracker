@@ -1,12 +1,12 @@
 import re
-
 import requests
-from bs4 import BeautifulSoup
 
 from config import (
-    ITEMMANIA_URL,
     ITEMMANIA_AVERAGE_TOP_N,
 )
+
+
+URL = "https://www.itemmania.com/sell/ajax_list.php"
 
 
 HEADERS = {
@@ -15,98 +15,106 @@ HEADERS = {
         "AppleWebKit/537.36 (KHTML, like Gecko) "
         "Chrome/137.0.0.0 Safari/537.36"
     ),
-    "Accept": (
-        "text/html,"
-        "application/xhtml+xml,"
-        "application/xml;q=0.9,"
-        "image/avif,"
-        "image/webp,*/*;q=0.8"
-    ),
-    "Accept-Language": "ko-KR,ko;q=0.9",
-    "Referer": "https://www.itemmania.com/",
+    "Referer": "https://www.itemmania.com/sell/list.html?search_game=4817",
+    "Origin": "https://www.itemmania.com",
+    "X-Requested-With": "XMLHttpRequest",
 }
 
 
-def parse_price(text: str):
+PAYLOAD = {
+    "search_game": "4817",
+    "search_server": "",
+    "search_faction": "",
+    "search_game_text": "언디셈버",
+    "search_server_text": "",
+    "search_goods": "all",
+    "search_word": "",
+    "search_type": "",
+    "money_listOrder": "",
+    "good_listOrder": "",
+    "srch_item_depth1": "",
+    "srch_item_depth2": "",
+    "srch_item_depth3": "",
+    "srch_item_depth4": "",
+    "order": "2",
+    "srch_char_alarm": "",
+    "overlap": "",
+    "goods_type": "1",
+    "trade_state": "1",
+    "credit_type": "1",
+    "pinit": "1",
+}
+
+
+PRICE_PATTERN = re.compile(
+    r"([\d,]+)원"
+)
+
+
+def parse_price(text):
 
     if not text:
         return None
 
-    numbers = re.sub(r"[^0-9]", "", text)
+    match = PRICE_PATTERN.search(text)
 
-    if not numbers:
+    if not match:
         return None
 
-    return int(numbers)
-
-
-def extract_trade_price(trade_money):
-
-    if trade_money is None:
-        return None
-
-    for node in trade_money.contents:
-
-        if isinstance(node, str):
-
-            text = node.strip()
-
-            if text:
-                return parse_price(text)
-
-    return parse_price(trade_money.get_text())
+    return int(
+        match.group(1)
+        .replace(",", "")
+    )
 
 
 def get_itemmania_market():
 
     print("=" * 60)
-    print("[Itemmania] 시세 수집 시작")
-
-    session = requests.Session()
+    print("[Itemmania] JSON 수집 시작")
 
     try:
 
-        response = session.get(
-            ITEMMANIA_URL,
+        response = requests.post(
+            URL,
             headers=HEADERS,
+            data=PAYLOAD,
             timeout=30,
         )
 
         response.raise_for_status()
 
+        data = response.json()
+
     except Exception as e:
 
-        print(f"[Itemmania] 접속 실패 : {e}")
+        print(f"[Itemmania] API 호출 실패 : {e}")
 
         return {
             "lowest": "",
             "average": "",
             "count": 0,
+            "total_quantity": 0,
             "prices": [],
         }
 
-    soup = BeautifulSoup(
-        response.text,
-        "lxml",
-    )
-
-    items = soup.select(
-        "li.list_item, li.block_item"
-    )
-
     prices = []
 
-    for item in items:
+    total_quantity = 0
 
-        trade_money = item.select_one(
-            ".trade_money"
-        )
+    trade_count = 0
 
-        if trade_money is None:
+    for item in data.get("g", []):
+
+        # 게임머니만
+        if item.get("trade_kind") != "3":
             continue
 
-        price = extract_trade_price(
-            trade_money
+        # 판매중만
+        if item.get("trade_state") != "a":
+            continue
+
+        price = parse_price(
+            item.get("ea_trade_money", "")
         )
 
         if price is None:
@@ -114,16 +122,26 @@ def get_itemmania_market():
 
         prices.append(price)
 
+        try:
+            total_quantity += int(
+                item.get("trade_quantity", "0")
+            )
+        except:
+            pass
+
+        trade_count += 1
+
     prices.sort()
 
     if not prices:
 
-        print("[Itemmania] 가격을 찾지 못했습니다.")
+        print("[Itemmania] 판매중 매물이 없습니다.")
 
         return {
             "lowest": "",
             "average": "",
             "count": 0,
+            "total_quantity": 0,
             "prices": [],
         }
 
@@ -134,29 +152,36 @@ def get_itemmania_market():
         / len(top_prices)
     )
 
-    print()
-
-    print(f"매물수 : {len(prices)}")
-    print(f"최저가 : {prices[0]:,}원")
-    print(f"평균가 : {average:,}원")
-
-    print("=" * 60)
-
-    return {
+    result = {
 
         "lowest": prices[0],
 
         "average": average,
 
-        "count": len(prices),
+        "count": trade_count,
+
+        "total_quantity": total_quantity,
 
         "prices": prices,
 
     }
 
+    print()
+
+    print(f"판매중 매물 : {trade_count}")
+    print(f"최저가 : {result['lowest']:,}원")
+    print(f"평균가 : {result['average']:,}원")
+    print(f"총 공급량 : {total_quantity:,}")
+
+    print("=" * 60)
+
+    return result
+
 
 if __name__ == "__main__":
 
     result = get_itemmania_market()
+
+    print()
 
     print(result)
