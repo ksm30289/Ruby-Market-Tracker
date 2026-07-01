@@ -1,9 +1,11 @@
-import os
 import re
-from collections import defaultdict
 from datetime import datetime, timedelta
 
-from config import OPENTALK_TXT_PATH
+from config import (
+    OPENTALK_DEDUPE_MINUTES,
+    OPENTALK_MIN_PRICE,
+    OPENTALK_MAX_PRICE,
+)
 
 
 CHAT_PATTERN = re.compile(
@@ -18,13 +20,13 @@ PRICE_PATTERNS = [
 ]
 
 TRADE_KEYWORDS = [
+    "루비",
     "삽니다",
     "팝니다",
     "판매",
     "구매",
     "매입",
     "정리",
-    "루비",
     "ㅅ",
     "ㅍ",
 ]
@@ -40,7 +42,22 @@ def convert_hour(ampm: str, hour: int) -> int:
     return hour
 
 
+def is_trade_message(message: str) -> bool:
+    if not message:
+        return False
+
+    text = message.strip()
+
+    if "1:" in text or "1：" in text:
+        return True
+
+    return any(keyword in text for keyword in TRADE_KEYWORDS)
+
+
 def extract_price(message: str):
+    if not message:
+        return None
+
     text = message.strip()
 
     for pattern in PRICE_PATTERNS:
@@ -51,65 +68,58 @@ def extract_price(message: str):
 
         price = float(match.group(1))
 
-        # 루비 시세 기준 이상치 방지
-        if 5 <= price <= 50:
+        if OPENTALK_MIN_PRICE <= price <= OPENTALK_MAX_PRICE:
             return price
 
     return None
 
 
-def is_trade_message(message: str) -> bool:
-    if "1:" in message or "1：" in message:
-        return True
+def parse_chat_line(line: str):
+    line = line.strip()
 
-    return any(keyword in message for keyword in TRADE_KEYWORDS)
+    if not line:
+        return None
+
+    match = CHAT_PATTERN.match(line)
+
+    if not match:
+        return None
+
+    year, month, day, ampm, hour, minute, speaker, message = match.groups()
+
+    hour = convert_hour(
+        ampm,
+        int(hour),
+    )
+
+    dt = datetime(
+        int(year),
+        int(month),
+        int(day),
+        hour,
+        int(minute),
+    )
+
+    return {
+        "datetime": dt,
+        "speaker": speaker.strip(),
+        "message": message.strip(),
+    }
 
 
-def read_text_file(path: str) -> str:
-    encodings = ["utf-8-sig", "utf-8", "cp949", "euc-kr"]
-
-    for encoding in encodings:
-        try:
-            with open(path, "r", encoding=encoding) as f:
-                return f.read()
-        except UnicodeDecodeError:
-            continue
-
-    with open(path, "r", encoding="utf-8", errors="ignore") as f:
-        return f.read()
-
-
-def parse_opentalk_prices(path: str):
-    if not os.path.exists(path):
-        print(f"[OpenTalk] 파일 없음: {path}")
-        return []
-
-    text = read_text_file(path)
-
+def parse_opentalk_prices(text: str):
     rows = []
 
+    if not text:
+        return rows
+
     for line in text.splitlines():
-        line = line.strip()
+        parsed = parse_chat_line(line)
 
-        if not line:
+        if not parsed:
             continue
 
-        match = CHAT_PATTERN.match(line)
-
-        if not match:
-            continue
-
-        year, month, day, ampm, hour, minute, speaker, message = match.groups()
-
-        hour = convert_hour(ampm, int(hour))
-
-        dt = datetime(
-            int(year),
-            int(month),
-            int(day),
-            hour,
-            int(minute),
-        )
+        message = parsed["message"]
 
         if not is_trade_message(message):
             continue
@@ -121,9 +131,9 @@ def parse_opentalk_prices(path: str):
 
         rows.append(
             {
-                "datetime": dt,
-                "speaker": speaker.strip(),
-                "message": message.strip(),
+                "datetime": parsed["datetime"],
+                "speaker": parsed["speaker"],
+                "message": message,
                 "price": price,
             }
         )
@@ -131,16 +141,14 @@ def parse_opentalk_prices(path: str):
     return rows
 
 
-def dedupe_prices(rows, minutes: int = 30):
-    """
-    같은 유저 + 같은 가격 + 30분 이내 반복 광고는 1건으로 처리.
-    """
-
-    rows = sorted(rows, key=lambda x: x["datetime"])
-
-    last_seen = {}
+def dedupe_prices(rows):
+    rows = sorted(
+        rows,
+        key=lambda row: row["datetime"],
+    )
 
     deduped = []
+    last_seen = {}
 
     for row in rows:
         key = (
@@ -150,7 +158,12 @@ def dedupe_prices(rows, minutes: int = 30):
 
         prev_dt = last_seen.get(key)
 
-        if prev_dt and row["datetime"] - prev_dt <= timedelta(minutes=minutes):
+        if (
+            prev_dt
+            and row["datetime"] - prev_dt <= timedelta(
+                minutes=OPENTALK_DEDUPE_MINUTES
+            )
+        ):
             continue
 
         deduped.append(row)
@@ -159,34 +172,31 @@ def dedupe_prices(rows, minutes: int = 30):
     return deduped
 
 
-def get_opentalk_market():
-    """
-    카카오톡 오픈톡 txt에서 루비 거래 시세를 추출한다.
+def get_opentalk_market(text: str, filename: str = ""):
+    print("=" * 60)
+    print("[OpenTalk] 시세 분석 시작")
 
-    반환:
-    {
-        "average": 17.2,
-        "lowest": 17.0,
-        "highest": 17.5,
-        "count": 58
-    }
-    """
-
-    print("[OpenTalk] 수집 시작")
+    if filename:
+        print(f"[OpenTalk] 파일명 : {filename}")
 
     try:
-        rows = parse_opentalk_prices(OPENTALK_TXT_PATH)
+        rows = parse_opentalk_prices(text)
         rows = dedupe_prices(rows)
 
-        prices = [row["price"] for row in rows]
+        prices = [
+            row["price"]
+            for row in rows
+        ]
 
         if not prices:
             print("[OpenTalk] 시세 데이터 없음")
+
             return {
                 "average": "",
                 "lowest": "",
                 "highest": "",
                 "count": 0,
+                "rows": [],
             }
 
         result = {
@@ -194,24 +204,24 @@ def get_opentalk_market():
             "lowest": min(prices),
             "highest": max(prices),
             "count": len(prices),
+            "rows": rows,
         }
 
-        print(
-            "[OpenTalk] 완료 "
-            f"평균={result['average']} / "
-            f"최저={result['lowest']} / "
-            f"최고={result['highest']} / "
-            f"거래글수={result['count']}"
-        )
+        print(f"거래글수 : {result['count']}")
+        print(f"평균 : {result['average']}")
+        print(f"최저 : {result['lowest']}")
+        print(f"최고 : {result['highest']}")
+        print("=" * 60)
 
         return result
 
     except Exception as e:
-        print(f"[OpenTalk] 수집 실패: {e}")
+        print(f"[OpenTalk] 분석 실패 : {e}")
 
         return {
             "average": "",
             "lowest": "",
             "highest": "",
             "count": 0,
+            "rows": [],
         }
