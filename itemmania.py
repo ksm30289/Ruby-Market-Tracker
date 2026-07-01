@@ -1,13 +1,14 @@
 import re
+import time
 import requests
 
 from config import (
     ITEMMANIA_AVERAGE_TOP_N,
 )
 
+LIST_URL = "https://www.itemmania.com/sell/list.html?search_game=4817"
 
-URL = "https://www.itemmania.com/sell/ajax_list.php"
-
+API_URL = "https://www.itemmania.com/sell/ajax_list.php"
 
 HEADERS = {
     "User-Agent": (
@@ -15,11 +16,10 @@ HEADERS = {
         "AppleWebKit/537.36 (KHTML, like Gecko) "
         "Chrome/137.0.0.0 Safari/537.36"
     ),
-    "Referer": "https://www.itemmania.com/sell/list.html?search_game=4817",
+    "Referer": LIST_URL,
     "Origin": "https://www.itemmania.com",
     "X-Requested-With": "XMLHttpRequest",
 }
-
 
 PAYLOAD = {
     "search_game": "4817",
@@ -45,10 +45,7 @@ PAYLOAD = {
     "pinit": "1",
 }
 
-
-PRICE_PATTERN = re.compile(
-    r"([\d,]+)원"
-)
+PRICE_PATTERN = re.compile(r"([\d,]+)원")
 
 
 def parse_price(text):
@@ -56,15 +53,37 @@ def parse_price(text):
     if not text:
         return None
 
-    match = PRICE_PATTERN.search(text)
+    m = PRICE_PATTERN.search(text)
 
-    if not match:
+    if not m:
         return None
 
     return int(
-        match.group(1)
-        .replace(",", "")
+        m.group(1).replace(",", "")
     )
+
+
+def request_json():
+
+    session = requests.Session()
+
+    # 세션 쿠키 확보
+    session.get(
+        LIST_URL,
+        headers=HEADERS,
+        timeout=20,
+    )
+
+    response = session.post(
+        API_URL,
+        headers=HEADERS,
+        data=PAYLOAD,
+        timeout=20,
+    )
+
+    response.raise_for_status()
+
+    return response.json()
 
 
 def get_itemmania_market():
@@ -72,22 +91,25 @@ def get_itemmania_market():
     print("=" * 60)
     print("[Itemmania] JSON 수집 시작")
 
-    try:
+    response_json = None
 
-        response = requests.post(
-            URL,
-            headers=HEADERS,
-            data=PAYLOAD,
-            timeout=30,
-        )
+    for attempt in range(3):
 
-        response.raise_for_status()
+        try:
 
-        data = response.json()
+            response_json = request_json()
 
-    except Exception as e:
+            break
 
-        print(f"[Itemmania] API 호출 실패 : {e}")
+        except Exception as e:
+
+            print(
+                f"[Itemmania] 재시도 {attempt+1}/3 실패 : {e}"
+            )
+
+            time.sleep(2)
+
+    if response_json is None:
 
         return {
             "lowest": "",
@@ -97,11 +119,23 @@ def get_itemmania_market():
             "prices": [],
         }
 
+    if response_json.get("result") != "SUCCESS":
+
+        print("[Itemmania] API 응답 실패")
+
+        return {
+            "lowest": "",
+            "average": "",
+            "count": 0,
+            "total_quantity": 0,
+            "prices": [],
+        }
+
+    data = response_json["data"]
+
     prices = []
 
     total_quantity = 0
-
-    trade_count = 0
 
     for item in data.get("g", []):
 
@@ -129,13 +163,11 @@ def get_itemmania_market():
         except:
             pass
 
-        trade_count += 1
-
     prices.sort()
 
     if not prices:
 
-        print("[Itemmania] 판매중 매물이 없습니다.")
+        print("[Itemmania] 판매중 매물 없음")
 
         return {
             "lowest": "",
@@ -145,11 +177,10 @@ def get_itemmania_market():
             "prices": [],
         }
 
-    top_prices = prices[:ITEMMANIA_AVERAGE_TOP_N]
+    top = prices[:ITEMMANIA_AVERAGE_TOP_N]
 
     average = round(
-        sum(top_prices)
-        / len(top_prices)
+        sum(top) / len(top)
     )
 
     result = {
@@ -158,7 +189,7 @@ def get_itemmania_market():
 
         "average": average,
 
-        "count": trade_count,
+        "count": len(prices),
 
         "total_quantity": total_quantity,
 
@@ -168,10 +199,10 @@ def get_itemmania_market():
 
     print()
 
-    print(f"판매중 매물 : {trade_count}")
+    print(f"판매중 매물 : {result['count']}")
     print(f"최저가 : {result['lowest']:,}원")
     print(f"평균가 : {result['average']:,}원")
-    print(f"총 공급량 : {total_quantity:,}")
+    print(f"총 공급량 : {result['total_quantity']:,}")
 
     print("=" * 60)
 
