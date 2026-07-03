@@ -4,7 +4,6 @@ import pytz
 
 from config import (
     TIMEZONE,
-    get_target_date,
 )
 
 from drive import get_latest_txt
@@ -12,11 +11,11 @@ from opentalk import get_opentalk_market
 from sheets import save_market
 
 
-def build_special_note(opentalk):
+def build_special_note(market):
 
     notes = []
 
-    if opentalk["count"] == 0:
+    if market["count"] == 0:
         notes.append("오픈톡 시세 없음")
 
     return " / ".join(notes)
@@ -34,24 +33,17 @@ def main():
 
     now = datetime.now(timezone)
 
-    target_date = get_target_date()
-
-    print(f"분석 대상 날짜 : {target_date}")
-    print()
-
     print("[1/3] Google Drive 최신 파일")
 
     latest = get_latest_txt()
 
-    print(
-        f"[Drive] {latest['name']}"
-    )
+    print(f"[Drive] {latest['name']}")
 
     print()
 
     print("[2/3] 오픈톡 시세 분석")
 
-    opentalk = get_opentalk_market(
+    markets = get_opentalk_market(
         latest["text"],
         latest["name"],
     )
@@ -60,73 +52,63 @@ def main():
 
     print("[3/3] Google Sheets 저장")
 
-    row = [
+    for date_text, market in sorted(markets.items()):
 
-        # A 날짜
-        target_date.strftime("%Y-%m-%d"),
+        row = [
 
-        # B 수집시간
-        now.strftime("%H:%M"),
+            # A 날짜
+            date_text,
 
-        # C 아이템매니아 평균
-        "",
+            # B 수집시간
+            now.strftime("%H:%M"),
 
-        # D 아이템매니아 최고
-        "",
+            # C 아이템매니아 평균
+            "",
 
-        # E 아이템매니아 최저
-        "",
+            # D 아이템매니아 최고
+            "",
 
-        # F 아이템매니아 매물수
-        "",
+            # E 아이템매니아 최저
+            "",
 
-        # G 오픈톡 평균
-        opentalk["average"],
+            # F 아이템매니아 매물수
+            "",
 
-        # H 오픈톡 최저
-        opentalk["lowest"],
+            # G 오픈톡 평균
+            market["average"],
 
-        # I 오픈톡 최고
-        opentalk["highest"],
+            # H 오픈톡 최저
+            market["lowest"],
 
-        # J 거래건수
-        opentalk["count"],
+            # I 오픈톡 최고
+            market["highest"],
 
-        # K 비고
-        "",
+            # J 거래건수
+            market["count"],
 
-        # L 특이사항
-        build_special_note(opentalk),
+            # K 비고
+            "",
 
-    ]
+            # L 특이사항
+            build_special_note(market),
 
-    save_market(row)
+        ]
+
+        save_market(row)
+
+        print(
+            f"[{date_text}] "
+            f"평균:{market['average']} "
+            f"최저:{market['lowest']} "
+            f"최고:{market['highest']} "
+            f"거래:{market['count']}"
+        )
 
     print()
 
     print("=" * 70)
     print(" 저장 완료")
     print("=" * 70)
-
-    print()
-
-    print("날짜 :", row[0])
-    print("시간 :", row[1])
-
-    print()
-
-    print("■ OpenTalk")
-    print(f"평균 : {row[6]}")
-    print(f"최저 : {row[7]}")
-    print(f"최고 : {row[8]}")
-    print(f"거래 : {row[9]}")
-
-    print()
-
-    if row[10]:
-
-        print("특이사항")
-        print(row[10])
 
     print()
 
