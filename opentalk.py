@@ -5,7 +5,6 @@ from config import (
     OPENTALK_DEDUPE_MINUTES,
     OPENTALK_MIN_PRICE,
     OPENTALK_MAX_PRICE,
-    get_target_date,
 )
 
 
@@ -110,12 +109,9 @@ def parse_chat_line(line: str):
 
 def parse_opentalk_prices(text: str):
 
-    target_date = get_target_date()
-
     rows = []
 
     total_messages = 0
-    target_messages = 0
 
     if not text:
         return rows
@@ -128,12 +124,6 @@ def parse_opentalk_prices(text: str):
             continue
 
         total_messages += 1
-
-        # 대상 날짜만 분석
-        if parsed["datetime"].date() != target_date:
-            continue
-
-        target_messages += 1
 
         message = parsed["message"]
 
@@ -156,9 +146,7 @@ def parse_opentalk_prices(text: str):
     print("=" * 60)
     print("[OpenTalk] 날짜 분석")
     print("=" * 60)
-    print(f"대상 날짜 : {target_date}")
     print(f"전체 메시지 : {total_messages:,}")
-    print(f"대상 날짜 메시지 : {target_messages:,}")
     print(f"거래글 : {len(rows):,}")
 
     return rows
@@ -195,7 +183,8 @@ def dedupe_prices(rows):
     return deduped
 
 
-def get_opentalk_market(text: str, filename: str = ""):
+def get_opentalk_markets(text: str, filename: str = ""):
+
     print("=" * 60)
     print("[OpenTalk] 시세 분석 시작")
 
@@ -203,6 +192,7 @@ def get_opentalk_market(text: str, filename: str = ""):
         print(f"[OpenTalk] 파일명 : {filename}")
 
     try:
+
         rows = parse_opentalk_prices(text)
 
         before_count = len(rows)
@@ -212,45 +202,52 @@ def get_opentalk_market(text: str, filename: str = ""):
         print(f"중복 제거 전 : {before_count}")
         print(f"중복 제거 후 : {len(rows)}")
 
-        prices = [
-            row["price"]
-            for row in rows
-        ]
+        daily = {}
 
-        if not prices:
-            print("[OpenTalk] 시세 데이터 없음")
+        for row in rows:
 
-            return {
-                "average": "",
-                "lowest": "",
-                "highest": "",
-                "count": 0,
-                "rows": [],
-            }
+            date = row["datetime"].strftime("%Y-%m-%d")
 
-        result = {
-            "average": round(sum(prices) / len(prices), 2),
-            "lowest": min(prices),
-            "highest": max(prices),
-            "count": len(prices),
-            "rows": rows,
-        }
+            # 가격이 아니라 row 전체 저장
+            daily.setdefault(date, []).append(row)
+
+        result = {}
 
         print()
-        print(f"평균 : {result['average']}")
-        print(f"최저 : {result['lowest']}")
-        print(f"최고 : {result['highest']}")
-        print(f"최종 거래글 : {result['count']}")
+
+        for date in sorted(daily):
+
+            rows = daily[date]
+
+            prices = [
+                row["price"]
+                for row in rows
+            ]
+
+            result[date] = {
+
+                "average": round(sum(prices) / len(prices), 2),
+
+                "lowest": min(prices),
+
+                "highest": max(prices),
+
+                "count": len(prices),
+
+            }
+
+            print(
+                f"{date} "
+                f"평균:{result[date]['average']} "
+                f"최저:{result[date]['lowest']} "
+                f"최고:{result[date]['highest']} "
+                f"거래:{result[date]['count']}"
+            )
 
         return result
 
     except Exception as e:
+
         print(f"[OpenTalk] 분석 실패 : {e}")
 
-        return {
-            "average": "",
-            "lowest": "",
-            "highest": "",
-            "count": 0,
-            "rows": [],
-        }
+        return {}
