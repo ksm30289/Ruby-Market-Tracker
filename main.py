@@ -7,7 +7,7 @@ from config import (
 )
 
 from drive import get_latest_txt
-from opentalk import get_opentalk_market
+from opentalk import get_opentalk_markets
 from sheets import save_market
 
 
@@ -43,7 +43,7 @@ def main():
 
     print("[2/3] 오픈톡 시세 분석")
 
-    markets = get_opentalk_market(
+    markets = get_opentalk_markets(
         latest["text"],
         latest["name"],
     )
